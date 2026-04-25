@@ -12,9 +12,10 @@ export async function POST(request: Request) {
     steps?: string;
     expectedResult?: string;
     actualResult?: string;
+    testCaseId?: string;
   };
 
-  createBug({
+  await createBug({
     title: body.title ?? "Tanpa judul",
     severity: body.severity ?? "Low",
     priority: body.priority ?? "Low",
@@ -22,6 +23,7 @@ export async function POST(request: Request) {
     steps: body.steps ?? "",
     expectedResult: body.expectedResult ?? "",
     actualResult: body.actualResult ?? "",
+    testCaseId: body.testCaseId,
   });
 
   return NextResponse.json({ success: true }, { status: 201 });

@@ -8,12 +8,12 @@ interface Params {
 }
 
 export async function PATCH(request: Request, { params }: Params) {
-  await params;
+  const { testCaseId } = await params;
 
   const body = (await request.json()) as { status?: TestCaseStatus };
   const status = body.status ?? "Untested";
 
-  updateTestCaseStatus(status);
+  await updateTestCaseStatus(status, testCaseId);
 
   return NextResponse.json({ success: true, status });
 }

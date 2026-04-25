@@ -3,14 +3,14 @@ import { NextResponse } from "next/server";
 import { getDashboardData, getPlanSummaryByStatus } from "@/lib/data-store";
 
 export async function GET() {
-  const data = getDashboardData();
+  const data = await getDashboardData();
 
   return NextResponse.json({
     ...data,
     summary: {
-      draft: getPlanSummaryByStatus("Draft"),
-      inReview: getPlanSummaryByStatus("In Review"),
-      approved: getPlanSummaryByStatus("Approved"),
+      draft: await getPlanSummaryByStatus("Draft"),
+      inReview: await getPlanSummaryByStatus("In Review"),
+      approved: await getPlanSummaryByStatus("Approved"),
     },
   });
 }

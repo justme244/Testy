@@ -46,6 +46,7 @@ export function TestCaseDetail({ testCase, updateCaseStatusAction }: TestCaseDet
 
       <form action={updateCaseStatusAction} className="mt-4 flex flex-wrap items-center gap-2">
         <input name="status" type="hidden" value="Passed" />
+        <input name="testCaseId" type="hidden" value={testCase.id} />
         <button className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white" type="submit">
           Mark Passed
         </button>

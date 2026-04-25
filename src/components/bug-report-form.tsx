@@ -2,10 +2,11 @@ import { type Bug } from "@/lib/types";
 
 interface BugReportFormProps {
   latestBug?: Bug;
+  testCaseId: string;
   createBugAction: (formData: FormData) => Promise<void>;
 }
 
-export function BugReportForm({ latestBug, createBugAction }: BugReportFormProps) {
+export function BugReportForm({ latestBug, testCaseId, createBugAction }: BugReportFormProps) {
   return (
     <section className="rounded-2xl border border-white/70 bg-white/90 p-5 shadow-[0_10px_30px_-18px_rgba(15,23,42,0.5)]">
       <header className="mb-4 flex flex-wrap items-start justify-between gap-4">
@@ -75,6 +76,8 @@ export function BugReportForm({ latestBug, createBugAction }: BugReportFormProps
             rows={2}
           />
         </label>
+
+        <input name="testCaseId" type="hidden" value={testCaseId} />
 
         <button className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white sm:col-span-2" type="submit">
           Simpan Bug & Sinkron Jira

@@ -11,6 +11,19 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# local env files (never commit secrets)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# sqlite / local db
+*.sqlite
+*.sqlite3
+*.db
+data/testy.sqlite
+
 # misc
 .DS_Store
 coverage/

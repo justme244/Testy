@@ -8,7 +8,7 @@ interface Params {
 
 export async function POST(_: Request, { params }: Params) {
   const { planId } = await params;
-  const success = approvePlan(planId);
+  const success = await approvePlan(planId);
 
   if (!success) {
     return NextResponse.json({ error: "Plan tidak ditemukan" }, { status: 404 });

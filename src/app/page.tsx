@@ -7,8 +7,8 @@ import { TestCaseDetail } from "@/components/test-case-detail";
 import { TestPlanBoard } from "@/components/test-plan-board";
 import { getDashboardData } from "@/lib/data-store";
 
-export default function Home() {
-  const data = getDashboardData();
+export default async function Home() {
+  const data = await getDashboardData();
 
   return (
     <main className="flex min-h-screen">
@@ -42,10 +42,15 @@ export default function Home() {
 
           <div className="grid gap-5 2xl:grid-cols-2">
             <TestCaseDetail testCase={data.testCase} updateCaseStatusAction={updateCaseStatusAction} />
-            <BugReportForm createBugAction={createBugAction} latestBug={data.bugs[0]} />
+            <BugReportForm createBugAction={createBugAction} latestBug={data.bugs[0]} testCaseId={data.testCase.id} />
           </div>
 
-          <CollaborationPanel addCommentAction={addCommentAction} comments={data.comments} histories={data.histories} />
+          <CollaborationPanel
+            addCommentAction={addCommentAction}
+            comments={data.comments}
+            histories={data.histories}
+            testCaseId={data.testCase.id}
+          />
         </div>
       </div>
     </main>
