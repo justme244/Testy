@@ -1,21 +1,18 @@
 import { randomUUID } from "node:crypto";
 
-import { and, desc, eq } from "drizzle-orm";
-
-import { db } from "@/db/client";
-import { bugs, comments, histories, projects, testCases, testPlans } from "@/db/schema";
+import {
+  BugModel,
+  CommentModel,
+  HistoryModel,
+  ProjectModel,
+  TestCaseModel,
+  TestPlanModel,
+} from "@/db/models";
+import { connectMongo } from "@/lib/mongodb";
 import { type DashboardData, type PlanStatus, type Priority, type Severity, type TestCaseStatus } from "@/lib/types";
 
-function parseSteps(raw: string) {
-  try {
-    return JSON.parse(raw) as string[];
-  } catch {
-    return raw.split("\n").filter(Boolean);
-  }
-}
-
 async function pushHistory(action: string) {
-  await db.insert(histories).values({
+  await HistoryModel.create({
     id: randomUUID(),
     action,
     timestamp: new Date().toISOString(),
@@ -23,17 +20,21 @@ async function pushHistory(action: string) {
 }
 
 export async function getDashboardData(): Promise<DashboardData> {
+  await connectMongo();
   await ensureDashboardHasData();
 
   const [allPlans, allCases, allBugs, allComments, allHistories] = await Promise.all([
-    db.select().from(testPlans),
-    db.select().from(testCases),
-    db.select().from(bugs).orderBy(desc(bugs.createdAt)),
-    db.select().from(comments).orderBy(desc(comments.time)),
-    db.select().from(histories).orderBy(desc(histories.timestamp)),
+    TestPlanModel.find().lean(),
+    TestCaseModel.find().lean(),
+    BugModel.find().sort({ createdAt: -1 }).lean(),
+    CommentModel.find().sort({ createdAt: -1 }).lean(),
+    HistoryModel.find().sort({ createdAt: -1 }).lean(),
   ]);
 
-  const focusedCase = allCases[0]!;
+  const focusedCase = allCases[0];
+  if (!focusedCase) {
+    throw new Error("No test case found. Please run seed script.");
+  }
 
   return {
     projectName: "Aplikasi A · Sprint 12",
@@ -52,11 +53,11 @@ export async function getDashboardData(): Promise<DashboardData> {
       title: focusedCase.title,
       type: focusedCase.type,
       status: focusedCase.status,
-      apiEndpoint: focusedCase.apiEndpoint ?? undefined,
-      apiMethod: focusedCase.apiMethod ?? undefined,
-      steps: parseSteps(focusedCase.steps),
-      expectedResponse: focusedCase.expectedResponse ?? undefined,
-      jiraTicket: focusedCase.jiraTicket ?? undefined,
+      apiEndpoint: focusedCase.apiEndpoint,
+      apiMethod: focusedCase.apiMethod,
+      steps: focusedCase.steps,
+      expectedResponse: focusedCase.expectedResponse,
+      jiraTicket: focusedCase.jiraTicket,
     },
     bugs: allBugs.map((bug) => ({
       id: bug.id,
@@ -67,8 +68,8 @@ export async function getDashboardData(): Promise<DashboardData> {
       steps: bug.steps,
       expectedResult: bug.expectedResult,
       actualResult: bug.actualResult,
-      jiraTicket: bug.jiraTicket ?? undefined,
-      createdAt: bug.createdAt,
+      jiraTicket: bug.jiraTicket,
+      createdAt: bug.createdAt?.toISOString() ?? new Date().toISOString(),
     })),
     comments: allComments.map((comment) => ({
       id: comment.id,
@@ -86,16 +87,20 @@ export async function getDashboardData(): Promise<DashboardData> {
 }
 
 export async function approvePlan(planId: string) {
-  const [plan] = await db.select().from(testPlans).where(eq(testPlans.id, planId)).limit(1);
+  await connectMongo();
+  const plan = await TestPlanModel.findOne({ id: planId });
   if (!plan) return false;
 
-  await db.update(testPlans).set({ status: "Approved" }).where(eq(testPlans.id, planId));
+  plan.status = "Approved";
+  await plan.save();
+
   await pushHistory(`Admin menyetujui test plan ${plan.title}`);
   return true;
 }
 
 export async function updateTestCaseStatus(status: TestCaseStatus, testCaseId = "tc-api-009") {
-  await db.update(testCases).set({ status }).where(eq(testCases.id, testCaseId));
+  await connectMongo();
+  await TestCaseModel.updateOne({ id: testCaseId }, { $set: { status } });
   await pushHistory(`Editor mengubah status test case menjadi ${status}`);
 }
 
@@ -109,11 +114,11 @@ export async function createBug(input: {
   actualResult: string;
   testCaseId?: string;
 }) {
-  const targetCaseId = input.testCaseId ?? "tc-api-009";
+  await connectMongo();
 
-  await db.insert(bugs).values({
+  await BugModel.create({
     id: randomUUID(),
-    testCaseId: targetCaseId,
+    testCaseId: input.testCaseId ?? "tc-api-009",
     title: input.title,
     severity: input.severity,
     priority: input.priority,
@@ -121,18 +126,17 @@ export async function createBug(input: {
     steps: input.steps,
     expectedResult: input.expectedResult,
     actualResult: input.actualResult,
-    createdAt: new Date().toISOString(),
   });
 
   await pushHistory(`Bug baru dibuat: ${input.title} (${input.severity}/${input.priority})`);
 }
 
 export async function addComment(input: { user: string; message: string; testCaseId?: string }) {
-  const targetCaseId = input.testCaseId ?? "tc-api-009";
+  await connectMongo();
 
-  await db.insert(comments).values({
+  await CommentModel.create({
     id: randomUUID(),
-    testCaseId: targetCaseId,
+    testCaseId: input.testCaseId ?? "tc-api-009",
     user: input.user,
     message: input.message,
     time: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
@@ -142,29 +146,13 @@ export async function addComment(input: { user: string; message: string; testCas
 }
 
 export async function getPlanSummaryByStatus(status: PlanStatus) {
-  const result = await db.select().from(testPlans).where(eq(testPlans.status, status));
-  return result.length;
+  await connectMongo();
+  return TestPlanModel.countDocuments({ status });
 }
 
 export async function ensureDashboardHasData() {
-  const [existingProject] = await db.select().from(projects).limit(1);
+  const existingProject = await ProjectModel.findOne({ id: "project-a" }).lean();
   if (existingProject) return;
 
-  await db.insert(projects).values({ id: "project-a", name: "Aplikasi A" });
-
-  const [existingCase] = await db.select().from(testCases).where(and(eq(testCases.id, "tc-api-009"))).limit(1);
-  if (!existingCase) {
-    await db.insert(testCases).values({
-      id: "tc-api-009",
-      scenario: "Checkout payment",
-      title: "TC-API-009 · Checkout with Valid Card",
-      type: "API",
-      status: "Untested",
-      apiEndpoint: "/api/v1/checkout",
-      apiMethod: "POST",
-      steps: JSON.stringify(["Seed placeholder"]),
-      expectedResponse: "{}",
-      jiraTicket: null,
-    });
-  }
+  await ProjectModel.create({ id: "project-a", name: "Aplikasi A" });
 }

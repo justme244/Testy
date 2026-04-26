@@ -1,29 +1,41 @@
 import { randomUUID } from "node:crypto";
 
-import { db } from "@/db/client";
-import { bugs, comments, histories, projects, testCases, testPlans, users } from "@/db/schema";
+import {
+  BugModel,
+  CommentModel,
+  HistoryModel,
+  ProjectModel,
+  TestCaseModel,
+  TestPlanModel,
+  UserModel,
+} from "@/db/models";
+import { connectMongo } from "@/lib/mongodb";
 
 async function seed() {
-  await db.delete(comments);
-  await db.delete(bugs);
-  await db.delete(testCases);
-  await db.delete(testPlans);
-  await db.delete(projects);
-  await db.delete(users);
-  await db.delete(histories);
+  await connectMongo();
 
-  await db.insert(users).values([
+  await Promise.all([
+    UserModel.deleteMany({}),
+    ProjectModel.deleteMany({}),
+    TestPlanModel.deleteMany({}),
+    TestCaseModel.deleteMany({}),
+    BugModel.deleteMany({}),
+    CommentModel.deleteMany({}),
+    HistoryModel.deleteMany({}),
+  ]);
+
+  await UserModel.insertMany([
     { id: "user-admin", name: "Admin Lead", role: "admin" },
     { id: "user-editor", name: "Rani Putri", role: "editor" },
     { id: "user-viewer", name: "Stakeholder", role: "viewer" },
   ]);
 
-  await db.insert(projects).values([
+  await ProjectModel.insertMany([
     { id: "project-a", name: "Aplikasi A" },
     { id: "project-b", name: "Client Portal" },
   ]);
 
-  await db.insert(testPlans).values([
+  await TestPlanModel.insertMany([
     {
       id: "plan-1",
       projectId: "project-a",
@@ -50,7 +62,7 @@ async function seed() {
     },
   ]);
 
-  await db.insert(testCases).values({
+  await TestCaseModel.create({
     id: "tc-api-009",
     scenario: "Checkout payment",
     title: "TC-API-009 · Checkout with Valid Card",
@@ -58,17 +70,17 @@ async function seed() {
     status: "Failed",
     apiEndpoint: "/api/v1/checkout",
     apiMethod: "POST",
-    steps: JSON.stringify([
+    steps: [
       "Login sebagai user Editor",
       "Pilih project Aplikasi A",
       "Jalankan endpoint POST /api/v1/checkout",
       "Validasi response 200 + field payment_token",
-    ]),
+    ],
     expectedResponse: '{\n  "status": "success",\n  "payment_token": "tok_xxxxx"\n}',
     jiraTicket: "https://jira.example.com/TEST-321",
   });
 
-  await db.insert(bugs).values({
+  await BugModel.create({
     id: "bug-1",
     testCaseId: "tc-api-009",
     title: "Payment token null",
@@ -78,10 +90,9 @@ async function seed() {
     expectedResult: "Token payment terbentuk sesuai format.",
     actualResult: "Response sukses namun payment_token bernilai null.",
     jiraTicket: "https://jira.example.com/TEST-321",
-    createdAt: new Date().toISOString(),
   });
 
-  await db.insert(comments).values([
+  await CommentModel.insertMany([
     {
       id: randomUUID(),
       testCaseId: "tc-api-009",
@@ -98,7 +109,7 @@ async function seed() {
     },
   ]);
 
-  await db.insert(histories).values([
+  await HistoryModel.insertMany([
     { id: randomUUID(), action: "Editor mengubah status test case menjadi Failed", timestamp: new Date().toISOString() },
     { id: randomUUID(), action: "System membuat draft bug report", timestamp: new Date().toISOString() },
     { id: randomUUID(), action: "Admin menandai prioritas sebagai Urgent", timestamp: new Date().toISOString() },
@@ -107,7 +118,9 @@ async function seed() {
   console.log("Seed completed");
 }
 
-seed().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+seed()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });

@@ -18,11 +18,11 @@ pnpm-debug.log*
 .env.test.local
 .env.production.local
 
-# sqlite / local db
+# local database artifacts
+data/
 *.sqlite
 *.sqlite3
 *.db
-data/testy.sqlite
 
 # misc
 .DS_Store
